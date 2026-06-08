@@ -1,0 +1,3 @@
+name = "DoH-CFW"
+main = "functions/dns-query.ts"
+compatibility_date = "2026-05-05"
