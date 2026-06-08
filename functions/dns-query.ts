@@ -1,30 +1,37 @@
 
 
 
-const MULLVAD_ENDPOINT = "https://family.dns.mullvad.net/dns-query";
 const DNS_MIME = "application/dns-message";
+
+/**
+ * UPSTREAM DoH ENDPOINT CONFIGURATION
+ * Change this URL to your preferred DNS-over-HTTPS provider.
+ */
+const UPSTREAM_DOH_ENDPOINT = "https://family.dns.mullvad.net/dns-query";
 
 /**
  * CUSTOM PATH CONFIGURATION
  * Change this to whatever path you want your DNS to listen on.
- * Examples: "/dns-query", "/my-private-dns", or "/" to use the root path.
+ * Highly recommended to use a specific path to block unauthorized bot traffic.
+ * Examples: "/dns-query", "/secure-dns", or "/" for the root domain.
  */
 const DNS_PATH = "/dns-query";
+
 
 export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
     const { method, url } = request;
     const parsedUrl = new URL(url);
 
-    // 1. Path Filter: Block unauthorized paths to save your daily request limits
+    // Path Filter: Drop random scanner bots instantly to protect your daily request quota
     if (parsedUrl.pathname !== DNS_PATH) {
-      return new Response(`DoH Proxy is active. Please route queries through: ${parsedUrl.origin}${DNS_PATH}`, {
+      return new Response(`DoH Proxy is active. Route queries through: ${parsedUrl.origin}${DNS_PATH}`, {
         status: 404,
         headers: { "Content-Type": "text/plain" },
       });
     }
 
-    // 2. Instant CORS preflight response
+    // Instant CORS preflight response
     if (method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -39,14 +46,14 @@ export default {
     const isGet = method === "GET";
     const cache = caches.default;
 
-    // 3. Serve from Cloudflare Edge Cache if available
+    // Serve from Cloudflare Edge Cache if available (Sub-2ms speeds)
     if (isGet) {
       const cachedResponse = await cache.match(request);
       if (cachedResponse) return cachedResponse;
     }
 
-    // 4. Forward seamlessly to Mullvad
-    const targetUrl = MULLVAD_ENDPOINT + parsedUrl.search;
+    // Dynamically append search queries (for GET requests) and point to your chosen provider
+    const targetUrl = UPSTREAM_DOH_ENDPOINT + parsedUrl.search;
     
     try {
       const upstreamResponse = await fetch(targetUrl, {
@@ -56,15 +63,15 @@ export default {
           "Content-Type": DNS_MIME,
           "User-Agent": "DoH-Edge/3.0",
         },
-        body: method === "POST" ? request.body : null,
+        body: method === "POST" ? request.body : null, // Zero-buffer streaming pass-through
       });
 
-      // 5. Clone and modify headers for the client
+      // Clone and modify headers for the client
       const responseHeaders = new Headers(upstreamResponse.headers);
       responseHeaders.set("Access-Control-Allow-Origin", "*");
       
       if (isGet && upstreamResponse.ok) {
-        responseHeaders.set("Cache-Control", "public, max-age=60");
+        responseHeaders.set("Cache-Control", "public, max-age=60"); // 60-second local edge memory cache
       }
 
       const finalizedResponse = new Response(upstreamResponse.body, {
@@ -72,7 +79,7 @@ export default {
         headers: responseHeaders,
       });
 
-      // Save to cache asynchronously in the background
+      // Save to cache asynchronously in the background without making the user wait
       if (isGet && upstreamResponse.ok) {
         ctx.waitUntil(cache.put(request, finalizedResponse.clone()));
       }
