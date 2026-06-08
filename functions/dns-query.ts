@@ -4,11 +4,27 @@
 const MULLVAD_ENDPOINT = "https://family.dns.mullvad.net/dns-query";
 const DNS_MIME = "application/dns-message";
 
+/**
+ * CUSTOM PATH CONFIGURATION
+ * Change this to whatever path you want your DNS to listen on.
+ * Examples: "/dns-query", "/my-private-dns", or "/" to use the root path.
+ */
+const DNS_PATH = "/dns-query";
+
 export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
     const { method, url } = request;
+    const parsedUrl = new URL(url);
 
-    // 1. Instant CORS preflight response
+    // 1. Path Filter: Block unauthorized paths to save your daily request limits
+    if (parsedUrl.pathname !== DNS_PATH) {
+      return new Response(`DoH Proxy is active. Please route queries through: ${parsedUrl.origin}${DNS_PATH}`, {
+        status: 404,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+
+    // 2. Instant CORS preflight response
     if (method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -23,14 +39,14 @@ export default {
     const isGet = method === "GET";
     const cache = caches.default;
 
-    // 2. Serve from Cloudflare Edge Cache if available
+    // 3. Serve from Cloudflare Edge Cache if available
     if (isGet) {
       const cachedResponse = await cache.match(request);
       if (cachedResponse) return cachedResponse;
     }
 
-    // 3. Forward seamlessly
-    const targetUrl = MULLVAD_ENDPOINT + new URL(url).search;
+    // 4. Forward seamlessly to Mullvad
+    const targetUrl = MULLVAD_ENDPOINT + parsedUrl.search;
     
     try {
       const upstreamResponse = await fetch(targetUrl, {
@@ -43,7 +59,7 @@ export default {
         body: method === "POST" ? request.body : null,
       });
 
-      // 4. Clone and modify headers for the client
+      // 5. Clone and modify headers for the client
       const responseHeaders = new Headers(upstreamResponse.headers);
       responseHeaders.set("Access-Control-Allow-Origin", "*");
       
@@ -56,7 +72,7 @@ export default {
         headers: responseHeaders,
       });
 
-      // Save to cache asynchronously without blocking the user
+      // Save to cache asynchronously in the background
       if (isGet && upstreamResponse.ok) {
         ctx.waitUntil(cache.put(request, finalizedResponse.clone()));
       }
