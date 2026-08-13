@@ -9,6 +9,8 @@ An ultra-fast, lightweight, and modern DNS over HTTPS (DoH) proxy built to run s
 * **ISP Bypass:** Encapsulates DNS traffic inside standard HTTPS, making it impossible for ISPs to intercept or block via traditional DNS filtering.
 * **Streaming Requests:** Direct HTTP body streaming for `POST` requests without unnecessary memory buffering.
 
+
+
 ---
 
 ## Project Structure
