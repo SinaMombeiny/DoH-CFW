@@ -196,7 +196,7 @@ For a command-line configuration, replace the URL below with your deployed endpo
 ```sh
 while uci -q delete https-dns-proxy.@https-dns-proxy[0]; do :; done
 uci set https-dns-proxy.doh="https-dns-proxy"
-uci set https-dns-proxy.doh.bootstrap_dns="9.9.9.9,149.112.112.112"
+uci set https-dns-proxy.doh.bootstrap_dns="76.76.2.2,94.140.14.14"
 uci set https-dns-proxy.doh.resolver_url="https://<worker-name>.<account-subdomain>.workers.dev/dns-query"
 uci set https-dns-proxy.doh.listen_addr="127.0.0.1"
 uci set https-dns-proxy.doh.listen_port="5053"
