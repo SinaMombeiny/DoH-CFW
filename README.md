@@ -1,8 +1,16 @@
-# DoH-CFW (DNS over HTTPS Cloudflare Worker)
+# <img src="https://cdn.simpleicons.org/cloudflare/F38020" alt="Cloudflare" width="25" height="25" /> DoH-CFW (DNS over HTTPS Cloudflare Worker)
 
 A lightweight and modern DNS over HTTPS (DoH) proxy built for Cloudflare’s global edge network. It forwards DNS queries to **Mullvad Privacy DNS** by default, while allowing the use of any compatible DoH provider.
 
 The project is intended for users who prefer encrypted DNS traffic over conventional local or ISP-provided resolvers. By carrying DNS requests over HTTPS, it can help reduce exposure to ordinary DNS filtering and monitoring at the network level.
+
+## Why This Project Exists
+
+Some ISPs and network-level filtering systems block the public hostnames used by well-known DNS-over-HTTPS providers. In these cases, simply configuring a public DoH resolver in a browser or operating system may not be sufficient, even though the DNS query itself is encrypted.
+
+DoH-CFW provides an alternative by placing the selected resolver behind a Cloudflare Worker. Clients connect to the Worker through HTTPS, while the Worker forwards the DNS query to the configured upstream provider. If the default `workers.dev` hostname is blocked or becomes unreliable, Cloudflare allows the Worker to be attached to a custom domain. This makes it possible to change the hostname used by clients without changing the proxy logic or the chosen upstream resolver.
+
+This does not guarantee access on every network: a filtering system may still block IP ranges, TLS traffic, or a custom domain. The purpose of this project is to provide a practical and user-controlled fallback when public DoH endpoints are not directly reachable.
 
 ## Features
 
@@ -12,8 +20,48 @@ The project is intended for users who prefer encrypted DNS traffic over conventi
 - **Streaming requests:** Forwards `POST` request bodies directly without unnecessary memory buffering.
 - **Configurable upstream resolver:** Uses Mullvad Privacy DNS by default, but supports any standard DNS-over-HTTPS endpoint.
 
----
 
+
+## Overview
+
+- [Choosing an Upstream DNS Provider](#choosing-an-upstream-dns-provider)
+- [Deployment and Usage](#-deployment-and-usage)
+  - [Option 1: Deploy the code manually](#option-1-deploy-the-code-manually)
+  - [Option 2: Fork the repository and deploy from GitHub](#option-2-fork-the-repository-and-deploy-from-github)
+- [Configuring Clients](#configuring-clients)
+  - [Chrome](#-chrome)
+  - [Firefox](#-firefox)
+  - [Brave](#-brave)
+  - [OpenWrt](#-openwrt)
+  - [Windows 11](#windows-11)
+  - [macOS, iPhone, and iPad](#macos-iphone-and-ipad)
+
+
+
+## Quick Configuration Guide
+
+```mermaid
+flowchart TD
+    A([Start]) --> B{Use the default<br/>DNS?}
+    B -->|Yes| C[Keep the default upstream]
+    B -->|No| D{Need custom<br/>filtering rules?}
+    D -->|Yes| E[Find the custom filter<br/>you need from AdGuard, ControlD, or Mullvad]
+    D -->|No| F[Use the AdGuard DNS or Control D<br/>endpoint listed in this README]
+    C --> G{How do you want<br/>to deploy?}
+    E --> G
+    F --> G
+    G -->|Manual| H[Copy dns-query.ts<br/>into a new Worker]
+    G -->|GitHub| I[Fork the repository<br/>and connect it to Cloudflare]
+    H --> J[Use your Worker DoH URL]
+    I --> J
+    J --> K{Where will you use it?}
+    K -->|Browser| L[Chrome, Firefox, or Brave<br/>Add the custom DoH URL]
+    K -->|Router| M[OpenWrt<br/>Configure https-dns-proxy]
+    K -->|Windows| N[Use a local encrypted DNS client<br/>for system-wide DNS]
+    K -->|Apple devices| O[Install a custom<br/>DNS configuration profile]
+```
+
+---
 ## Choosing an Upstream DNS Provider
 
 The Worker uses Mullvad Privacy DNS by default. If you prefer another DNS provider, change this line in `functions/dns-query.ts`:
@@ -188,28 +236,6 @@ Configuration profiles can contain more than DNS settings. Install profiles only
 
 ---
 
-## Quick Configuration Guide
-
-```mermaid
-flowchart TD
-    A([Start]) --> B{Use the default<br/>DNS?}
-    B -->|Yes| C[Keep the default upstream]
-    B -->|No| D{Need custom<br/>filtering rules?}
-    D -->|Yes| E[Find the custom filter<br/>you need from AdGuard, ControlD, or Mullvad]
-    D -->|No| F[Use the AdGuard DNS or Control D<br/>endpoint listed in this README]
-    C --> G{How do you want<br/>to deploy?}
-    E --> G
-    F --> G
-    G -->|Manual| H[Copy dns-query.ts<br/>into a new Worker]
-    G -->|GitHub| I[Fork the repository<br/>and connect it to Cloudflare]
-    H --> J[Use your Worker DoH URL]
-    I --> J
-    J --> K{Where will you use it?}
-    K -->|Browser| L[Chrome, Firefox, or Brave<br/>Add the custom DoH URL]
-    K -->|Router| M[OpenWrt<br/>Configure https-dns-proxy]
-    K -->|Windows| N[Use a local encrypted DNS client<br/>for system-wide DNS]
-    K -->|Apple devices| O[Install a custom<br/>DNS configuration profile]
-```
 
 ## Project Structure
 
