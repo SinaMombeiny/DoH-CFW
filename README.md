@@ -236,14 +236,6 @@ Configuration profiles can contain more than DNS settings. Install profiles only
 
 ---
 
-
-## Project Structure
-
-```text
-├── functions/
-│   └── dns-query.ts  # Core DoH proxy and edge-caching logic
-└── wrangler.toml     # Cloudflare deployment configuration
-```
 > *Why did I create this project?*
 Because I need it. This configuration is what I use every day. When I need something, I build it myself if I have the ability and skills to do so.
 If you have any ideas or improvements for this DNS over HTTPS project, please share them in the Issues, Discussions, or Pull Requests sections.
