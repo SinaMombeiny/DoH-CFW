@@ -12,6 +12,15 @@ DoH-CFW places the upstream resolver behind a Cloudflare Worker. Clients connect
 
 This does not guarantee access on every network. Filtering systems may still block Cloudflare IP ranges, TLS fingerprints, or custom domains. The goal is to provide a practical, user-controlled fallback.
 
+## Features
+
+- **Edge caching** — Uses Cloudflare’s `caches.default` for repeated queries.
+- **Non-blocking** — Background tasks (cache writes) run with `ctx.waitUntil`.
+- **Streaming** — `POST` bodies are forwarded without full buffering.
+- **Path protection** — Requests outside the configured path are rejected.
+- **Configurable upstream** — Defaults to Control D Family; any standard DoH endpoint can be used.
+- **CORS support** — Handles `OPTIONS` preflight requests.
+
 ## Architecture Overview
 
 ```mermaid
@@ -30,17 +39,9 @@ flowchart LR
 
 The Worker itself does not resolve DNS records. It only proxies the encrypted query and response.
 
-## Features
-
-- **Edge caching** — Uses Cloudflare’s `caches.default` for repeated queries.
-- **Non-blocking** — Background tasks (cache writes) run with `ctx.waitUntil`.
-- **Streaming** — `POST` bodies are forwarded without full buffering.
-- **Path protection** — Requests outside the configured path are rejected.
-- **Configurable upstream** — Defaults to Control D Family; any standard DoH endpoint can be used.
-- **CORS support** — Handles `OPTIONS` preflight requests.
-
 ## Overview
 
+- [Features](#features)
 - [Architecture Overview](#architecture-overview)
 - [Choosing an Upstream DNS Provider](#choosing-an-upstream-dns-provider)
 - [Deployment and Usage](#-deployment-and-usage)
