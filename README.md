@@ -1,18 +1,47 @@
 # <img src="https://cdn.simpleicons.org/cloudflare/F38020" alt="Cloudflare" width="25" height="25" /> DoH-CFW (DNS over HTTPS Cloudflare Worker)
-A lightweight and modern DNS over HTTPS (DoH) proxy built for Cloudflare’s global edge network. It forwards DNS queries to **Control D** by default, while allowing the use of any compatible DoH provider.
-The project is intended for users who prefer encrypted DNS traffic over conventional local or ISP-provided resolvers. By carrying DNS requests over HTTPS, it can help reduce exposure to ordinary DNS filtering and monitoring at the network level.
+
+A lightweight DNS over HTTPS (DoH) proxy running on Cloudflare’s edge network. It forwards DNS queries to **Control D** by default and supports any compatible DoH provider.
+
+The project is designed for users who want encrypted DNS when public DoH endpoints are blocked or unreliable.
+
 ## Why This Project Exists
-Some ISPs and network-level filtering systems block the public hostnames used by well-known DNS-over-HTTPS providers. In these cases, simply configuring a public DoH resolver in a browser or operating system may not be sufficient, even though the DNS query itself is encrypted.
-DoH-CFW provides an alternative by placing the selected resolver behind a Cloudflare Worker. Clients connect to the Worker through HTTPS, while the Worker forwards the DNS query to the configured upstream provider. If the default `workers.dev` hostname is blocked or becomes unreliable, Cloudflare allows the Worker to be attached to a custom domain. This makes it possible to change the hostname used by clients without changing the proxy logic or the chosen upstream resolver.
-This does not guarantee access on every network: a filtering system may still block IP ranges, TLS traffic, or a custom domain. The purpose of this project is to provide a practical and user-controlled fallback when public DoH endpoints are not directly reachable.
+
+Some networks block the public hostnames of well-known DoH providers. In these cases, configuring a public resolver directly is not enough.
+
+DoH-CFW places the upstream resolver behind a Cloudflare Worker. Clients connect to the Worker over HTTPS, and the Worker forwards the query to the chosen upstream provider. A custom domain can also be attached if the default `workers.dev` hostname becomes blocked.
+
+This does not guarantee access on every network. Filtering systems may still block Cloudflare IP ranges, TLS fingerprints, or custom domains. The goal is to provide a practical, user-controlled fallback.
+
+## Architecture Overview
+
+```mermaid
+flowchart LR
+    A[Client] -->|HTTPS DoH request| B[Cloudflare Worker]
+    B -->|Forward query| C[Upstream DoH Provider]
+    C -->|DNS response| B
+    B -->|Encrypted response| A
+```
+
+**Flow:**
+1. The client sends a standard DoH request (`GET` or `POST`) to the Worker.
+2. The Worker validates the path and optionally serves the response from edge cache.
+3. If not cached, the Worker forwards the request to the configured upstream DoH endpoint.
+4. The upstream response is returned to the client. Successful `GET` responses are stored in the edge cache for a short period.
+
+The Worker itself does not resolve DNS records. It only proxies the encrypted query and response.
+
 ## Features
-- **Edge caching:** Uses Cloudflare’s `caches.default` to serve repeated DNS queries from a nearby edge location when possible.
-- **Lightweight & non-blocking:** Written in pure TypeScript. Background work (such as cache writes) runs with `ctx.waitUntil` so the response is not delayed.
-- **Streaming support:** Forwards `POST` request bodies directly without buffering the entire payload in memory.
-- **Path protection:** Rejects requests that do not match the configured DNS path, reducing unnecessary traffic from scanners and bots.
-- **Configurable upstream:** Defaults to Control D Family, but any standard DNS-over-HTTPS endpoint can be used.
-- **CORS ready:** Handles `OPTIONS` preflight requests for browser-based clients.
+
+- **Edge caching** — Uses Cloudflare’s `caches.default` for repeated queries.
+- **Non-blocking** — Background tasks (cache writes) run with `ctx.waitUntil`.
+- **Streaming** — `POST` bodies are forwarded without full buffering.
+- **Path protection** — Requests outside the configured path are rejected.
+- **Configurable upstream** — Defaults to Control D Family; any standard DoH endpoint can be used.
+- **CORS support** — Handles `OPTIONS` preflight requests.
+
 ## Overview
+
+- [Architecture Overview](#architecture-overview)
 - [Choosing an Upstream DNS Provider](#choosing-an-upstream-dns-provider)
 - [Deployment and Usage](#-deployment-and-usage)
   - [Option 1: Deploy the code manually](#option-1-deploy-the-code-manually)
@@ -24,7 +53,10 @@ This does not guarantee access on every network: a filtering system may still bl
   - [OpenWrt](#-openwrt)
   - [Windows 11](#windows-11)
   - [macOS, iPhone, and iPad](#macos-iphone-and-ipad)
+- [Limitations and Security Considerations](#limitations-and-security-considerations)
+
 ## Quick Configuration Guide
+
 ```mermaid
 flowchart TD
     A([Start]) --> B{Use the default<br/>DNS?}
@@ -42,28 +74,30 @@ flowchart TD
     K -->|Windows| N[Use a local encrypted DNS client<br/>for system-wide DNS]
     K -->|Apple devices| O[Install a custom<br/>DNS configuration profile]
 ```
+
 ---
+
 ## Choosing an Upstream DNS Provider
 
-By default this project uses **Control D Family** as the upstream resolver:
+By default this project uses **Control D Family**:
 
 ```ts
 const UPSTREAM_DOH_ENDPOINT = "https://freedns.controld.com/family";
 ```
 
-According to Control D, this filter blocks malware, ads, trackers, adult content, and drug-related sites. It is a practical choice for kids’ devices or shared home networks.
+According to Control D, this filter blocks malware, ads, trackers, adult content, and drug-related sites. It is suitable for kids’ devices or shared home networks.
 
-If you prefer a different resolver, replace the value of `UPSTREAM_DOH_ENDPOINT` in `functions/dns-query.ts` with any standard DNS-over-HTTPS endpoint.
+To use a different resolver, change the value of `UPSTREAM_DOH_ENDPOINT` in `functions/dns-query.ts`.
 
-I do not recommend using Google Public DNS or Cloudflare’s standard public resolver when ad blocking, tracker blocking, or malware protection is important. These are plain DNS services and do not perform any special filtering.
+Google Public DNS and Cloudflare’s standard public resolver are plain DNS services and do not perform special filtering. Prefer a filtering resolver when ad/tracker/malware blocking matters.
 
 ### Control D Free Resolvers
 
 | Filter | Description | Endpoint |
 |--------|-------------|----------|
-| **Malware Protection** | Blocks known dangerous sites to reduce the risk of malware and scams | `https://freedns.controld.com/p1` |
+| **Malware Protection** | Blocks known dangerous sites | `https://freedns.controld.com/p1` |
 | **Ads & Tracking** | Blocks malware, ads, and trackers | `https://freedns.controld.com/p2` |
-| **Social** | Blocks major social media apps and sites (useful for reducing distractions) | `https://freedns.controld.com/p3` |
+| **Social** | Blocks major social media sites | `https://freedns.controld.com/p3` |
 | **Family** (default) | Blocks malware, ads, trackers, adult content, and drug-related sites | `https://freedns.controld.com/family` |
 
 ### AdGuard Free Resolvers
@@ -71,10 +105,10 @@ I do not recommend using Google Public DNS or Cloudflare’s standard public res
 | Filter | Description | Endpoint |
 |--------|-------------|----------|
 | **Default** | Blocks ads and trackers | `https://dns.adguard-dns.com/dns-query` |
-| **Non-filtering** | No blocking of ads, trackers, or any other requests | `https://unfiltered.adguard-dns.com/dns-query` |
-| **Family protection** | Blocks ads, trackers, and adult content; enables Safe Search and Safe Mode where possible | `https://family.adguard-dns.com/dns-query` |
+| **Non-filtering** | No blocking | `https://unfiltered.adguard-dns.com/dns-query` |
+| **Family protection** | Blocks ads, trackers, adult content + Safe Search | `https://family.adguard-dns.com/dns-query` |
 
-**Note:** In my own testing, AdGuard DNS did not block ads and malware as completely as expected.
+**Note:** In testing, AdGuard DNS did not block ads and malware as completely as expected.
 
 ### More providers
 
@@ -82,64 +116,72 @@ A larger list of public DNS-over-HTTPS providers is available here:
 [https://adguard-dns.io/kb/general/dns-providers/](https://adguard-dns.io/kb/general/dns-providers/)
 
 <sub>Before choosing an upstream resolver, review its privacy policy. This project encrypts the connection between the client and Cloudflare, but the upstream DNS provider still receives and resolves the actual queries.</sub>
+
 ---
+
 ## <img src="https://cdn.simpleicons.org/cloudflare/F38020" alt="Cloudflare" width="22" height="22" /> Deployment and Usage
-There are two practical ways to deploy this project on Cloudflare Workers.
+
 ### Option 1: Deploy the code manually
-This is the simplest method if you only need the DNS proxy and do not want to manage a GitHub repository.
+
 1. Open [`functions/dns-query.ts`](https://github.com/SinaMombeiny/DoH-CFW/blob/main/functions/dns-query.ts) and copy the code.
-2. Sign in to the [Cloudflare Dashboard](https://dash.cloudflare.com/), then open **Workers & Pages**.
-3. Select **Create application** and create a new Worker from a Worker starter template.
-4. Open the Worker editor and replace the default code with the contents of `dns-query.ts`.
-5. Select **Deploy**.
-After deployment, Cloudflare provides a public Worker address. In this project, the DoH endpoint follows this format:
+2. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages**.
+3. Create a new Worker and replace the default code with the contents of `dns-query.ts`.
+4. Deploy.
+
+The DoH endpoint will look like:
+
 ```text
 https://<worker-name>.<account-subdomain>.workers.dev/dns-query
 ```
-Replace the placeholder values with the address assigned to your Worker. This URL can be used as a custom DoH endpoint in browsers, routers, and compatible operating systems.
+
 ### Option 2: Fork the repository and deploy from GitHub
-This method is recommended if you want to keep your configuration under version control and deploy future changes automatically.
+
 1. Fork the [DoH-CFW repository](https://github.com/SinaMombeiny/DoH-CFW).
-2. Open **Workers & Pages** in the Cloudflare Dashboard.
-3. Select **Create application** and choose the option to import an existing Git repository.
-4. Connect your GitHub account and select your fork of this repository.
-5. Review the project settings and select **Deploy**.
-Cloudflare will build and deploy the project automatically. Any future changes pushed to the connected branch can trigger a new deployment.
-For Cloudflare’s current deployment workflow, refer to the official [Cloudflare Workers documentation](https://developers.cloudflare.com/workers/get-started/dashboard/).
+2. In **Workers & Pages**, create a new application and import the forked repository.
+3. Deploy.
+
+Future pushes to the connected branch can trigger automatic redeployments.
+
 ---
+
 ## Configuring Clients
-The examples below use the following placeholder. Replace it with your own deployed Worker URL before saving any setting:
+
+Replace the placeholder below with your deployed Worker URL:
+
 ```text
 https://<worker-name>.<account-subdomain>.workers.dev/dns-query
 ```
+
 ### <img src="https://cdn.simpleicons.org/googlechrome/4285F4" alt="Chrome" width="20" height="20" /> Chrome
-1. Open **Settings**.
-2. Go to **Privacy and security** → **Security**.
-3. Under **Advanced**, enable **Use secure DNS**.
-4. Select the custom provider option and paste your Worker URL.
-Chrome uses this resolver for DNS requests made by the browser. A custom provider is preferable here because it prevents Chrome from silently switching to its usual unencrypted DNS mode when the configured provider is available.
-### <img src="https://cdn.simpleicons.org/firefox/FF7139" alt="Firefox" width="20" height="20" /> Firefox
-1. Open **Settings** → **Privacy & Security**.
-2. Scroll to **DNS over HTTPS** and select **Advanced settings**.
-3. Choose **Custom Protection**.
-4. Enter your Worker URL as the custom provider.
-5. If you do not want Firefox to fall back silently when secure DNS is unavailable, enable the option to show a warning instead.
-Firefox also offers **Max Protection**, which keeps secure DNS enabled and displays a warning if the resolver cannot be reached. This is the stricter choice when avoiding fallback matters more than uninterrupted browsing.
-### <img src="https://cdn.simpleicons.org/brave/FB542B" alt="Brave" width="20" height="20" /> Brave
+
 1. Open **Settings** → **Privacy and security** → **Security**.
-2. Under **Advanced**, enable **Use secure DNS**.
-3. Select **With Custom** and paste your Worker URL.
-You can also open `brave://settings/security` directly to reach this setting.
-> Browser-level DoH applies only to traffic generated by that browser. It does not change DNS resolution for other applications, the operating system, or devices on the local network.
+2. Enable **Use secure DNS**.
+3. Select the custom provider and paste your Worker URL.
+
+### <img src="https://cdn.simpleicons.org/firefox/FF7139" alt="Firefox" width="20" height="20" /> Firefox
+
+1. Open **Settings** → **Privacy & Security**.
+2. Under **DNS over HTTPS**, choose **Custom Protection** (or **Max Protection**).
+3. Enter your Worker URL.
+
+### <img src="https://cdn.simpleicons.org/brave/FB542B" alt="Brave" width="20" height="20" /> Brave
+
+1. Open **Settings** → **Privacy and security** → **Security**.
+2. Enable **Use secure DNS** → **With Custom** and paste your Worker URL.
+
+> Browser-level DoH only affects traffic from that browser. It does not change system or other application DNS.
+
 ### <img src="https://cdn.simpleicons.org/openwrt/00B5E2" alt="OpenWrt" width="20" height="20" /> OpenWrt
-For OpenWrt, use a local DoH client such as [`https-dns-proxy`](https://openwrt.org/docs/guide-user/services/dns/doh_dnsmasq_https-dns-proxy). It receives ordinary DNS requests from `dnsmasq` and forwards them to the Worker over HTTPS.
-Install the proxy and its LuCI interface:
+
+Install `https-dns-proxy`:
+
 ```sh
 opkg update
 opkg install https-dns-proxy luci-app-https-dns-proxy
 ```
-You can then configure it from **LuCI** at **Services** → **HTTPS DNS Proxy**. Add a custom provider and use your Worker URL as the resolver URL.
-For a command-line configuration, replace the URL below with your deployed endpoint:
+
+Configure the resolver URL in **Services** → **HTTPS DNS Proxy**, or via CLI:
+
 ```sh
 while uci -q delete https-dns-proxy.@https-dns-proxy[0]; do :; done
 uci set https-dns-proxy.doh="https-dns-proxy"
@@ -150,25 +192,39 @@ uci set https-dns-proxy.doh.listen_port="5053"
 uci commit https-dns-proxy
 service https-dns-proxy restart
 ```
-The bootstrap resolver is used only to resolve the Worker hostname before the encrypted DoH connection is established. LAN clients should continue to use the router as their DNS server so that `dnsmasq` can forward their queries to `https-dns-proxy`.
+
 ### Windows 11
-Windows 11 supports DNS over HTTPS natively, but its system-wide configuration maps a DoH template to a fixed DNS server IP address. A `workers.dev` endpoint sits behind Cloudflare’s shared, dynamic edge network and does not provide a fixed resolver IP for this purpose. For that reason, do not use a Cloudflare edge IP as a static Windows DNS server merely to point it at a Worker.
-For browser-only use, configure Chrome, Firefox, or Brave as described above. For a system-wide setup, the safer approach is to run a local, open-source encrypted DNS client such as [dnscrypt-proxy](https://github.com/DNSCrypt/dnscrypt-proxy):
-1. Download it only from the project’s official GitHub releases and verify the release signature before running it.
-2. Configure your Worker URL as the sole upstream DoH resolver.
-3. Run the service on loopback addresses only, such as `127.0.0.1` and `::1`.
-4. Set the Windows network adapter to use the local proxy as its only DNS server. Do not add a public secondary resolver, as that can bypass the encrypted local proxy when it is unavailable.
-This design keeps unencrypted DNS traffic confined to the local machine; the connection from the proxy to the Worker remains encrypted. Microsoft documents the native DoH commands in [`netsh dnsclient`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-dnsclient), but those commands are appropriate only when the upstream resolver has a stable DNS-server IP.
+
+Windows native DoH requires a fixed DNS server IP. A `workers.dev` endpoint does not provide one, so native configuration is not recommended.
+
+For system-wide use, run a local client such as [dnscrypt-proxy](https://github.com/DNSCrypt/dnscrypt-proxy):
+1. Configure your Worker URL as the only upstream.
+2. Bind it to `127.0.0.1` / `::1`.
+3. Point the Windows network adapter to the local proxy only.
+
 ### macOS, iPhone, and iPad
-Apple devices support encrypted DNS through configuration profiles. To use a custom DoH endpoint system-wide, create a `.mobileconfig` profile that contains your Worker URL and install it on the device.
-Free profile generators are available. I use [Senki’s DNS profile tool](https://dns.senkl.eu/tool.html) to generate a profile for a custom DoH endpoint.
-1. Enter your deployed Worker URL in the profile generator.
-2. Generate and download the `.mobileconfig` file.
-3. Review the profile before installation and confirm that it contains only the intended DNS configuration.
-4. On iPhone or iPad, open the profile in Safari, allow the download, then install it from **Settings** → **General** → **VPN & Device Management**.
-5. On macOS, open the downloaded profile and review and install it from **System Settings**.
-Configuration profiles can contain more than DNS settings. Install profiles only from a source you trust, and verify that the DNS URL in the profile is exactly your own Worker endpoint. Apple’s [DNS Settings payload documentation](https://support.apple.com/guide/deployment/dns-settings-payload-settings-dep86469ba99/1/web/1.0) describes the underlying encrypted-DNS profile format.
+
+Use a configuration profile containing your Worker URL. Tools such as [Senki’s DNS profile generator](https://dns.senkl.eu/tool.html) can create the `.mobileconfig` file.
+
+Install the profile only after verifying that it contains exactly your intended DoH endpoint.
+
 ---
-> *Why did I create this project?*
-Because I need it. This configuration is what I use every day. When I need something, I build it myself if I have the ability and skills to do so.
-If you have any ideas or improvements for this DNS over HTTPS project, please share them in the Issues, Discussions, or Pull Requests sections.
+
+## Limitations and Security Considerations
+
+- **This is a proxy, not a resolver.** The Worker does not perform DNS resolution itself. All queries are forwarded to the configured upstream provider.
+- **Upstream visibility.** The upstream DNS provider (Control D, AdGuard, etc.) still sees the domain names being queried. Encrypting the path to Cloudflare does not hide queries from the upstream.
+- **Cloudflare visibility.** Cloudflare can see the client IP and the fact that a DoH request was made to your Worker. The query content itself is encrypted between the client and the Worker, and again between the Worker and the upstream.
+- **No strong anonymity.** This project improves encryption and can help bypass simple hostname blocking. It is not designed for strong anonymity or censorship resistance against sophisticated adversaries.
+- **Caching.** Successful `GET` responses may be cached at the edge for a short time. This improves performance but means identical queries from different clients can be served from cache.
+- **Path protection is basic.** The custom path reduces casual scanning, but it is not a security boundary. Anyone who discovers the full URL can still use the endpoint.
+- **Custom domains.** Attaching a custom domain can improve reachability, but the domain itself may also be blocked.
+
+Always review the privacy policy of the upstream DNS provider you choose.
+
+---
+
+> *Why did I create this project?*  
+> Because I needed a simple, self-hosted DoH proxy that I could control. This is the configuration I use daily.
+
+Suggestions and improvements are welcome via Issues, Discussions, or Pull Requests.
