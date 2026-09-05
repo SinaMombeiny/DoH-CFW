@@ -6,11 +6,12 @@ Some ISPs and network-level filtering systems block the public hostnames used by
 DoH-CFW provides an alternative by placing the selected resolver behind a Cloudflare Worker. Clients connect to the Worker through HTTPS, while the Worker forwards the DNS query to the configured upstream provider. If the default `workers.dev` hostname is blocked or becomes unreliable, Cloudflare allows the Worker to be attached to a custom domain. This makes it possible to change the hostname used by clients without changing the proxy logic or the chosen upstream resolver.
 This does not guarantee access on every network: a filtering system may still block IP ranges, TLS traffic, or a custom domain. The purpose of this project is to provide a practical and user-controlled fallback when public DoH endpoints are not directly reachable.
 ## Features
-- **Low-latency responses:** Uses Cloudflare’s `caches.default` engine to serve repeated DNS queries from a nearby edge location when possible.
-- **Lightweight architecture:** Written in pure TypeScript with non-blocking execution through `ctx.waitUntil`.
-- **Encrypted DNS transport:** Sends DNS queries over standard HTTPS rather than traditional DNS ports.
-- **Streaming requests:** Forwards `POST` request bodies directly without unnecessary memory buffering.
-- **Configurable upstream resolver:** Uses Control D by default, but supports any standard DNS-over-HTTPS endpoint.
+- **Edge caching:** Uses Cloudflare’s `caches.default` to serve repeated DNS queries from a nearby edge location when possible.
+- **Lightweight & non-blocking:** Written in pure TypeScript. Background work (such as cache writes) runs with `ctx.waitUntil` so the response is not delayed.
+- **Streaming support:** Forwards `POST` request bodies directly without buffering the entire payload in memory.
+- **Path protection:** Rejects requests that do not match the configured DNS path, reducing unnecessary traffic from scanners and bots.
+- **Configurable upstream:** Defaults to Control D Family, but any standard DNS-over-HTTPS endpoint can be used.
+- **CORS ready:** Handles `OPTIONS` preflight requests for browser-based clients.
 ## Overview
 - [Choosing an Upstream DNS Provider](#choosing-an-upstream-dns-provider)
 - [Deployment and Usage](#-deployment-and-usage)
@@ -44,7 +45,7 @@ flowchart TD
 ---
 ## Choosing an Upstream DNS Provider
 
-The Worker uses **Control D Family** as the default upstream resolver:
+By default this project uses **Control D Family** as the upstream resolver:
 
 ```ts
 const UPSTREAM_DOH_ENDPOINT = "https://freedns.controld.com/family";
@@ -54,15 +55,15 @@ According to Control D, this filter blocks malware, ads, trackers, adult content
 
 If you prefer a different resolver, replace the value of `UPSTREAM_DOH_ENDPOINT` in `functions/dns-query.ts` with any standard DNS-over-HTTPS endpoint.
 
-I do not recommend using Google Public DNS or Cloudflare’s standard public resolver when ad blocking, tracker blocking, or malware protection is important. Those services focus on speed and reliability rather than comprehensive filtering.
+I do not recommend using Google Public DNS or Cloudflare’s standard public resolver when ad blocking, tracker blocking, or malware protection is important. These are plain DNS services and do not perform any special filtering.
 
 ### Control D Free Resolvers
 
 | Filter | Description | Endpoint |
 |--------|-------------|----------|
-| **p1** | Blocks known dangerous sites to reduce the risk of malware and scams | `https://freedns.controld.com/p1` |
-| **p2** | Blocks malware, ads, and trackers | `https://freedns.controld.com/p2` |
-| **p3** | Blocks major social media apps and sites (useful for reducing distractions) | `https://freedns.controld.com/p3` |
+| **Malware Protection** | Blocks known dangerous sites to reduce the risk of malware and scams | `https://freedns.controld.com/p1` |
+| **Ads & Tracking** | Blocks malware, ads, and trackers | `https://freedns.controld.com/p2` |
+| **Social** | Blocks major social media apps and sites (useful for reducing distractions) | `https://freedns.controld.com/p3` |
 | **Family** (default) | Blocks malware, ads, trackers, adult content, and drug-related sites | `https://freedns.controld.com/family` |
 
 ### AdGuard DNS
@@ -80,11 +81,7 @@ I do not recommend using Google Public DNS or Cloudflare’s standard public res
 A larger list of public DNS-over-HTTPS providers is available here:  
 [https://adguard-dns.io/kb/general/dns-providers/](https://adguard-dns.io/kb/general/dns-providers/)
 
-You can also create fully custom filtering profiles on:
-- [Control D Free DNS](https://controld.com/free-dns)
-- [AdGuard DNS](https://adguard-dns.io/en/public-dns.html)
-
-Before choosing an upstream resolver, review its privacy policy. This Worker encrypts the connection between the client and Cloudflare, but the upstream DNS provider still receives and resolves the actual queries.
+<sub>Before choosing an upstream resolver, review its privacy policy. This project encrypts the connection between the client and Cloudflare, but the upstream DNS provider still receives and resolves the actual queries.</sub>
 ---
 ## <img src="https://cdn.simpleicons.org/cloudflare/F38020" alt="Cloudflare" width="22" height="22" /> Deployment and Usage
 There are two practical ways to deploy this project on Cloudflare Workers.
