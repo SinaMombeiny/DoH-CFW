@@ -28,12 +28,9 @@ This does not guarantee access on every network: a filtering system may still bl
 flowchart TD
     A([Start]) --> B{Use the default<br/>DNS?}
     B -->|Yes| C[Keep the default upstream]
-    B -->|No| D{Need custom<br/>filtering rules?}
-    D -->|Yes| E[Find the custom filter<br/>you need from AdGuard or Control D]
-    D -->|No| F[Use the AdGuard DNS<br/>endpoint listed in this README]
+    B -->|No| D[Choose a custom upstream DNS<br/>AdGuard, Control D, or any other DoH provider]
     C --> G{How do you want<br/>to deploy?}
-    E --> G
-    F --> G
+    D --> G
     G -->|Manual| H[Copy dns-query.ts<br/>into a new Worker]
     G -->|GitHub| I[Fork the repository<br/>and connect it to Cloudflare]
     H --> J[Use your Worker DoH URL]
