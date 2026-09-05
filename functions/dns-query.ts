@@ -7,7 +7,7 @@ const DNS_MIME = "application/dns-message";
  * UPSTREAM DoH ENDPOINT CONFIGURATION
  * Change this URL to your preferred DNS-over-HTTPS provider.
  */
-const UPSTREAM_DOH_ENDPOINT = "https://family.dns.mullvad.net/dns-query";
+const UPSTREAM_DOH_ENDPOINT = "https://freedns.controld.com/family";
 
 /**
  * CUSTOM PATH CONFIGURATION
