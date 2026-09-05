@@ -43,23 +43,48 @@ flowchart TD
 ```
 ---
 ## Choosing an Upstream DNS Provider
-The Worker uses Control D by default. If you prefer another DNS provider, change this line in `functions/dns-query.ts`:
+
+The Worker uses **Control D Family** as the default upstream resolver:
+
 ```ts
 const UPSTREAM_DOH_ENDPOINT = "https://freedns.controld.com/family";
 ```
-Replace it with the DNS-over-HTTPS endpoint of your preferred provider. The selected resolver must support the standard DoH protocol.
-If ad blocking, tracker blocking, and malware protection are important to you, I do not recommend using Google Public DNS or Cloudflare’s standard public resolver for this purpose. Their primary role is fast and reliable DNS resolution; they are not designed to comprehensively filter advertising, trackers, and malicious domains.
-For a privacy-conscious setup with filtering, I recommend the following DNS-over-HTTPS endpoint:
+
+According to Control D, this filter blocks malware, ads, trackers, adult content, and drug-related sites. It is a practical choice for kids’ devices or shared home networks.
+
+If you prefer a different resolver, replace the value of `UPSTREAM_DOH_ENDPOINT` in `functions/dns-query.ts` with any standard DNS-over-HTTPS endpoint.
+
+I do not recommend using Google Public DNS or Cloudflare’s standard public resolver when ad blocking, tracker blocking, or malware protection is important. Those services focus on speed and reliability rather than comprehensive filtering.
+
+### Control D Free Resolvers
+
+| Filter | Description | Endpoint |
+|--------|-------------|----------|
+| **p1** | Blocks known dangerous sites to reduce the risk of malware and scams | `https://freedns.controld.com/p1` |
+| **p2** | Blocks malware, ads, and trackers | `https://freedns.controld.com/p2` |
+| **p3** | Blocks major social media apps and sites (useful for reducing distractions) | `https://freedns.controld.com/p3` |
+| **Family** (default) | Blocks malware, ads, trackers, adult content, and drug-related sites | `https://freedns.controld.com/family` |
+
 ### AdGuard DNS
-```ts
-const UPSTREAM_DOH_ENDPOINT = "https://dns.adguard-dns.com/dns-query";
-```
-This option is suitable for users who want an additional filtering layer without changing the Worker’s core logic.
-### Custom DNS Profiles
-If you need more control over filtering categories, security policies, family-safe rules, or custom blocklists, you can generate a DNS endpoint based on your own requirements through these services:
-- [AdGuard DNS — Public DNS](https://adguard-dns.io/en/public-dns.html)
-- [Control D — Free DNS](https://controld.com/free-dns)
-Before selecting an upstream resolver, review its privacy policy and filtering documentation. While this Worker encrypts the connection between the client and Cloudflare, the upstream DNS provider still receives and resolves DNS queries.
+
+| Filter | Description | Endpoint |
+|--------|-------------|----------|
+| **Default** | Blocks ads and trackers | `https://dns.adguard-dns.com/dns-query` |
+| **Non-filtering** | No blocking of ads, trackers, or any other requests | `https://unfiltered.adguard-dns.com/dns-query` |
+| **Family protection** | Blocks ads, trackers, and adult content; enables Safe Search and Safe Mode where possible | `https://family.adguard-dns.com/dns-query` |
+
+**Note:** In my own testing, AdGuard DNS did not block ads and malware as completely as expected.
+
+### More providers
+
+A larger list of public DNS-over-HTTPS providers is available here:  
+[https://adguard-dns.io/kb/general/dns-providers/](https://adguard-dns.io/kb/general/dns-providers/)
+
+You can also create fully custom filtering profiles on:
+- [Control D Free DNS](https://controld.com/free-dns)
+- [AdGuard DNS](https://adguard-dns.io/en/public-dns.html)
+
+Before choosing an upstream resolver, review its privacy policy. This Worker encrypts the connection between the client and Cloudflare, but the upstream DNS provider still receives and resolves the actual queries.
 ---
 ## <img src="https://cdn.simpleicons.org/cloudflare/F38020" alt="Cloudflare" width="22" height="22" /> Deployment and Usage
 There are two practical ways to deploy this project on Cloudflare Workers.
