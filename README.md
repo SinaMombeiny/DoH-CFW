@@ -66,7 +66,7 @@ I do not recommend using Google Public DNS or Cloudflare’s standard public res
 | **Social** | Blocks major social media apps and sites (useful for reducing distractions) | `https://freedns.controld.com/p3` |
 | **Family** (default) | Blocks malware, ads, trackers, adult content, and drug-related sites | `https://freedns.controld.com/family` |
 
-### AdGuard DNS
+### AdGuard Free Resolvers
 
 | Filter | Description | Endpoint |
 |--------|-------------|----------|
