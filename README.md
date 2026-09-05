@@ -23,13 +23,7 @@ This does not guarantee access on every network. Filtering systems may still blo
 
 ## Architecture Overview
 
-```mermaid
-flowchart LR
-    A[Client] -->|HTTPS DoH request| B[Cloudflare Worker]
-    B -->|Forward query| C[Upstream DoH Provider]
-    C -->|DNS response| B
-    B -->|Encrypted response| A
-```
+<img width="2692" height="482" alt="Architecture" src="https://github.com/user-attachments/assets/b5c97c05-3613-4256-8c43-32742ed3a48b" />
 
 **Flow:**
 1. The client sends a standard DoH request (`GET` or `POST`) to the Worker.
